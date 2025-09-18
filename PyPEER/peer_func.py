@@ -11,11 +11,12 @@ import os
 import sys
 import csv
 import json
+from tabnanny import verbose
 import numpy as np
 import pandas as pd
 import nibabel as nib
 from sklearn.svm import SVR
-from sklearn.externals import joblib
+import joblib
 
 
 def scaffolding():
@@ -224,7 +225,7 @@ def global_signal_regression(_data, _eye_mask_path):
 
     """
 
-    eye_mask = nib.load(_eye_mask_path).get_data()
+    eye_mask = nib.load(_eye_mask_path).get_fdata()
 
     global_mask = np.array(eye_mask, dtype=bool)
 
@@ -246,8 +247,6 @@ def global_signal_regression(_data, _eye_mask_path):
     Y_res = Y - X.dot(B)
 
     _data[global_mask] = Y_res.T
-
-    print('GSR completed.')
 
     return _data
 
@@ -285,7 +284,7 @@ def motion_scrub(_ms_filename, _data_dir, _motion_threshold):
     return _removed_indices
 
 
-def prepare_data_for_svr(_data, _removed_time_points, _eye_mask_path):
+def prepare_data_for_svr(_data, _removed_time_points, _eye_mask_path, verbose=False):
     """
     Preprocess fMRI data prior to SVR model generation
 
@@ -304,35 +303,35 @@ def prepare_data_for_svr(_data, _removed_time_points, _eye_mask_path):
 
     """
 
-    if _removed_time_points is not None:
-        print(str('The {}th volume(s) were removed.').format(_removed_time_points))
+    if verbose:
+        print(f'-{len(_removed_time_points)} volume(s) were removed by motion scrubbing.')
     else:
         _removed_time_points = []
 
     _processed_data = []
     _calibration_points_removed = []
 
+    _eye_mask = nib.load(_eye_mask_path).get_fdata().astype(bool)
+
     for num in range(int(_data.shape[3]/5)):
 
         vol_set = [x for x in np.arange(num * 5, (num + 1) * 5) if x not in _removed_time_points]
 
         if len(vol_set) != 0:
-
-            _processed_data.append(np.average(_data[:, :, :, vol_set], axis=3).ravel())
+            _processed_data.append(_data[_eye_mask, :][:, vol_set].mean(axis=1))
+            #_processed_data.append(np.average(_data[:, :, :, vol_set], axis=3).ravel())
 
         else:
 
             _calibration_points_removed.append(num)
 
-    if  (_calibration_points_removed) and (_removed_time_points):
-        print(str('The {}th calibration point(s) were removed.').format(_calibration_points_removed))
-    elif (not _calibration_points_removed) and (_removed_time_points):
-        print(str('No calibration points were removed.'))
+    if verbose:
+        print(f'-{len(_calibration_points_removed)} calibration point(s) were removed.')
 
     return _processed_data, _calibration_points_removed
 
 
-def train_model(_data, _calibration_points_removed, _stimulus_path):
+def train_model(_data, _calibration_points_removed, _stimulus_path, monitor_res=(), verbose=False):
     """
     Trains the SVR model used in the PEER method
 
@@ -358,8 +357,15 @@ def train_model(_data, _calibration_points_removed, _stimulus_path):
     monitor_height = 1050
 
     fixations = pd.read_csv(_stimulus_path)
-    x_targets = np.repeat(np.array(fixations['pos_x']), 1) * monitor_width / 2
-    y_targets = np.repeat(np.array(fixations['pos_y']), 1) * monitor_height / 2
+    x_targets = np.repeat(np.array(fixations['pos_x']), 1)
+    y_targets = np.repeat(np.array(fixations['pos_y']), 1)
+    if len(monitor_res) == 2:
+        if verbose:
+            print(f'\n-Converting to pixels w/ monitor res: {monitor_res[0]}x{monitor_res[1]}')
+        x_targets = x_targets * monitor_width / 2
+        y_targets = y_targets * monitor_height / 2
+    elif verbose:
+        print(f'\n-Using PsychoPy norm units') 
 
     x_targets = list(np.delete(np.array(x_targets), _calibration_points_removed))
     y_targets = list(np.delete(np.array(y_targets), _calibration_points_removed))
