@@ -353,8 +353,6 @@ def train_model(_data, _calibration_points_removed, _stimulus_path, monitor_res=
 
     """
 
-    monitor_width = 1680
-    monitor_height = 1050
 
     fixations = pd.read_csv(_stimulus_path)
     x_targets = np.repeat(np.array(fixations['pos_x']), 1)
@@ -362,8 +360,8 @@ def train_model(_data, _calibration_points_removed, _stimulus_path, monitor_res=
     if len(monitor_res) == 2:
         if verbose:
             print(f'\n-Converting to pixels w/ monitor res: {monitor_res[0]}x{monitor_res[1]}')
-        x_targets = x_targets * monitor_width / 2
-        y_targets = y_targets * monitor_height / 2
+        x_targets = x_targets * monitor_res[0] / 2
+        y_targets = y_targets * monitor_res[1] / 2
     elif verbose:
         print(f'\n-Using PsychoPy norm units') 
 
@@ -372,7 +370,7 @@ def train_model(_data, _calibration_points_removed, _stimulus_path, monitor_res=
 
     _xmodel = SVR(kernel='linear', C=100, epsilon=.01, verbose=2)
     _xmodel.fit(_data, x_targets)
-    print(x_targets)
+    #print(x_targets)
 
     _ymodel = SVR(kernel='linear', C=100, epsilon=.01, verbose=2)
     _ymodel.fit(_data, y_targets)
