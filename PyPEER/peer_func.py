@@ -302,11 +302,10 @@ def prepare_data_for_svr(_data, _removed_time_points, _eye_mask_path, verbose=Fa
         List of calibration points removed if all volumes for a given calibration point were high motion
 
     """
-
-    if verbose:
-        print(f'-{len(_removed_time_points)} volume(s) were removed by motion scrubbing.')
-    else:
+    if _removed_time_points is None:
         _removed_time_points = []
+    elif len(_removed_time_points) != 0 and verbose:     
+        print(f'-{len(_removed_time_points)} volume(s) were removed by motion scrubbing.')
 
     _processed_data = []
     _calibration_points_removed = []
